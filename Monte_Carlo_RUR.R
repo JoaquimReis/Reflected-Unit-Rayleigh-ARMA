@@ -5,16 +5,17 @@
 
 rm(list = ls())
 
+set.seed(10)
 source("simuRUR.R")
 source("FitRUR.R")
 
-alpha = .7
-phi =  0.4  #AR
-theta = 0.2 #MA
+alpha = 1
+phi =  0.5  #AR
+theta = -0.2 #MA
 tau =  0.5
 true_values <- c(alpha, phi, theta)
 vn <- c(70, 150, 300, 500, 1000)  # Tamanhos amostrais
-R <- 100 
+R <- 10000 
 z <- 1.96 
 
 ar1 <- 1
@@ -36,7 +37,7 @@ system.time({
     
     for (i in 1:R) {
       y <- simu.RUR(n, phi = phi, theta = theta, alpha = alpha,tau = tau, freq = 12, link = "logit")
-      fit1 <- try(suppressWarnings(RURarma.fit(y, ma = ar1, ar = ar1)), silent = TRUE)
+      fit1 <- try(suppressWarnings(RURarma.fit(y, ma = ma1, ar = ar1)), silent = TRUE)
       
       if (inherits(fit1, "try-error") ) {#|| fit1$convergence != 0) {
         bug <- bug + 1
@@ -81,3 +82,4 @@ system.time({
 end_time <- Sys.time()
 execution_time <- end_time - start_time
 print(paste("Tempo total de execução:", round(as.numeric(execution_time, units = "secs")), "segundos"))
+
