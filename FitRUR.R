@@ -56,16 +56,19 @@ RURarma.fit<-function (y, ar = NA, ma = NA, tau = .5, link = "logit", h = 1,
   
   # Ajuste das variaveis e dados para um modelo autoregressivo
   
+  # Verifica se há elemntos NA em `ar`
   if(any(is.na(ar)) == F) {
     names_phi <- c(paste("phi", ar, sep = ""))
     Z <- suppressWarnings(matrix(ynew, (n-1), p1)[m:(n-1),])} else {
       ar = p1<-0; Z <- NA  
     } 
   
+  # Verifica se há elemntos NA em `ma`
   if(any(is.na(ma)) == F) {
     names_theta <- c(paste("theta", ma, sep = ""))
   } else ma = q1 <- 0 
   
+  # Verifica se há elemntos NA em `X` - Covariaveis
   if(any(is.na(X)) == F){
     names_beta<-c(paste("beta", 1 : ncol(as.matrix(X)), sep = ""))
     Xm <- X[(m+1):n, ]     
@@ -93,6 +96,9 @@ RURarma.fit<-function (y, ar = NA, ma = NA, tau = .5, link = "logit", h = 1,
   initial <- rep(0, k + p1 + q1 + 1)
   initial[1 : (k+p1+1)] <- ols
   
+  if(q1 > 0){
+    initial[(k + p1 + 2):(k + p1 + q1 + 1)] <- 0.1
+  }
   
   loglik <- function(z) 
   {
@@ -106,7 +112,8 @@ RURarma.fit<-function (y, ar = NA, ma = NA, tau = .5, link = "logit", h = 1,
     
     for(i in (m+1):n)
     {
-      eta[i] <- alpha + Xbeta[i] + (ynew_ar[(i-1), ar] - Xbeta_ar[(i-1), ar])%*%phi + t(theta)%*%error[i-ma]
+      eta[i] <- alpha + Xbeta[i] + (ynew_ar[(i-1), ar] - Xbeta_ar[(i-1), ar])%*%phi + 
+        t(theta)%*%error[i-ma]
       error[i] <- ynew[i] - eta[i] 
     }
     mu <- linkinv(eta[(m+1):n])
@@ -125,83 +132,72 @@ RURarma.fit<-function (y, ar = NA, ma = NA, tau = .5, link = "logit", h = 1,
   #############################################################################
   
   # # VETOR SCORE 
-  # escore.LogBarma <- function(z)
-  # {
-  #   alpha <- z[1]
-  #   if(k == 0) beta <- as.matrix(0) else beta <- as.matrix(z[2:(k + 1)])
-  #   if(p1 == 0) {phi <- as.matrix(0); ar <- 1} else phi <- as.matrix(z[(k + 2):(k + p1 + 1)])
-  #   if(q1 == 0) theta <- as.matrix(0) else theta <- as.matrix(z[(k + p1 + 2):(k + p1 + q1 + 1)])
-  #   
-  #   Xbeta <- X %*% beta
-  #   Xbeta_ar <- suppressWarnings(matrix(Xbeta, (n - 1), max(p, 1, na.rm = T)))
-  #   
-  #   for(i in (m + 1):n) {
-  #     eta[i] <- alpha + Xbeta[i] + 
-  #       (ynew_ar[(i - 1), ar] - Xbeta_ar[(i - 1), ar]) %*% phi +
-  #       t(theta) %*% error[i - ma]
-  #     error[i] <- ynew[i] - eta[i]
-  #   }
-  #   
-  #   mu <- linkinv(eta[(m+1):n])
-  #   # x  <- y[(m+1):n] 
-  #   x<-y1
-  #   Xbeta <- X%*%beta
-  #   for(i in 1:(n-m)){
-  #     R[i,] <- error[i+m-ma]*k_i}
-  #   
-  #   for(i in (m+1):n)
-  #   {
-  #     deta.dalpha[i] <- 1 - deta.dalpha[i-ma]%*%theta
-  #     deta.dbeta[i,] <- X[i,] - t(phi)%*%X[i-ar,] - t(theta)%*%deta.dbeta[i-ma,]
-  #     deta.dphi[i,] <- ynew_ar[i-ar]- Xbeta[i-ar] - t(theta)%*%deta.dphi[i-ma,]
-  #     deta.dtheta[i,] <- R[(i-m),] - t(theta)%*%deta.dtheta[i-ma,]
-  #   }
-  #   
-  #   v <- deta.dalpha[(m+1):n]
-  #   rM <- deta.dbeta[(m+1):n,]
-  #   rP <- deta.dphi[(m+1):n,]
-  #   rR <- deta.dtheta[(m+1):n,]
-  #   
-  #   mT <- diag(mu.eta(eta[(m+1):n]))
-  #   
-  #   #####################  EDITAR AQUI  
-  #   #ell_q
-  #   
-  #   A  <- (mu/(mu+24))^(-1/2) - 5
-  #   dA <- -(1/2)*(mu/(mu+24))^(-3/2)*(24/(mu+24)^2)
-  #   a_t <- -dA/A - (4*dA/A^2)*log(x) + (2*dA/A^2)*(x^(2/A)*log(x)/(1-x^(2/A)))
-  #   
-  #   # a_t<-
-  #   #   - (-(1/2) * (mu/(mu + 24))^(-3/2) * (24/(mu + 24)^2)) /
-  #   #   ((mu/(mu + 24))^(-1/2) - 5) -
-  #   #   (4 * (-(1/2) * (mu/(mu + 24))^(-3/2) * (24/(mu + 24)^2)) /
-  #   #      ((mu/(mu + 24))^(-1/2) - 5)^2) * log(y1) +
-  #   #   (2 * (-(1/2) * (mu/(mu + 24))^(-3/2) * (24/(mu + 24)^2)) /
-  #   #      ((mu/(mu + 24))^(-1/2) - 5)^2) *
-  #   #   ( y1^(2 / ((mu/(mu + 24))^(-1/2) - 5)) * log(y1) /
-  #   #       (1 - y1^(2 / ((mu/(mu + 24))^(-1/2) - 5))) )
-  #   
-  #   
-  #   
-  #   Ualpha <- t(v) %*% mT %*% a_t
-  #   Ubeta <- t(rM) %*% mT %*% a_t
-  #   Uphi <-   t(rP) %*% mT %*% a_t
-  #   Utheta <- t(rR) %*% mT %*% a_t
-  #   
-  #   if (k == 0) {
-  #     rval <- c(Ualpha, Uphi, Utheta)
-  #   } else {
-  #     rval <- c(Ualpha, Ubeta, Uphi, Utheta)
-  #   }
-  #   return(rval)}
-  # 
-  # stopifnot(length(initial) == length(escore.LogBarma(initial)))
-  
-  
+  escore.RUR <- function(z)
+  {
+    alpha <- z[1]
+    if(k == 0) beta <- as.matrix(0) else beta <- as.matrix(z[2:(k + 1)])
+    if(p1 == 0) {phi <- as.matrix(0); ar <- 1} else phi <- as.matrix(z[(k + 2):(k + p1 + 1)])
+    if(q1 == 0) theta <- as.matrix(0) else theta <- as.matrix(z[(k + p1 + 2):(k + p1 + q1 + 1)])
+
+    Xbeta <- X %*% beta
+    Xbeta_ar <- suppressWarnings(matrix(Xbeta, (n - 1), max(p, 1, na.rm = T)))
+    for(i in (m + 1):n) {
+      eta[i] <- alpha + Xbeta[i] + (ynew_ar[(i - 1), ar] - Xbeta_ar[(i - 1), ar]) %*% phi +
+        t(theta) %*% error[i - ma]
+      error[i] <- ynew[i] - eta[i]
+    }
+
+    mu <- linkinv(eta[(m+1):n])
+    x  <- y[(m+1):n]
+    x<-y1
+    Xbeta <- X%*%beta
+    for(i in 1:(n-m)){
+      R[i,] <- error[i+m-ma]*k_i}
+
+    for(i in (m+1):n)
+    {
+      deta.dalpha[i] <- 1 - deta.dalpha[i-ma]%*%theta
+      deta.dbeta[i,] <- X[i,] - t(phi)%*%X[i-ar,] - t(theta)%*%deta.dbeta[i-ma,]
+      deta.dphi[i,] <- ynew_ar[i-ar]- Xbeta[i-ar] - t(theta)%*%deta.dphi[i-ma,]
+      deta.dtheta[i,] <- R[(i-m),] - t(theta)%*%deta.dtheta[i-ma,]
+    }
+
+    v <- deta.dalpha[(m+1):n]
+    rM <- deta.dbeta[(m+1):n,]
+    rP <- deta.dphi[(m+1):n,]
+    rR <- deta.dtheta[(m+1):n,]
+
+    mT <- diag(mu.eta(eta[(m+1):n]))
+
+    #####################  DUVIDA AQUI
+    
+    #ell_q
+    a_t <- (2/((1-mu)*log(1-mu)))*(1+log(1-tau)*(log(1-y)/log(1-mu))^(2))
+    
+    y_sust <- #como funciona aqui, no arquivo do Thiago é usado y_sust, mas no
+              # da LB não, como tratar?
+      
+    # Cálculo das derivadas parciais
+    Ualpha <- t(v) %*% mT %*% a_t
+    Ubeta <- t(rM) %*% mT %*% a_t
+    Uphi <- t(rP) %*% mT %*% a_t
+    Utheta <- t(rR) %*% mT %*% a_t
+    
+    # Construir o vetor score
+    if (k == 0) {
+      rval <- c(Ualpha, Uphi, Utheta) # 3
+    } else {
+      rval <- c(Ualpha, Ubeta, Uphi, Utheta) #porque 4
+    }
+    
+    return(rval)
+  }
+
+  # ATE AQUI
   ##############################################################################
   #ATENCAO AQUI - USO DO VETOR SCORE
   opt <- optim(initial, loglik,
-               #escore.LogBarma,  # vetor escore adaptado
+               escore.RUR,  # vetor escore adaptado
                method = "BFGS", hessian = TRUE,
                control = list(fnscale = -1, maxit = maxit1, reltol = 1e-12))
   
@@ -257,113 +253,110 @@ RURarma.fit<-function (y, ar = NA, ma = NA, tau = .5, link = "logit", h = 1,
   colnames(model_presentation) <- c("Estimate", "Std. Error", "z value", "Pr(>|z|)")
   z$model <- model_presentation
   
-  ######################################### verifiquei ate aqui 
-  # 
-  # # Predicted values   (NO REGRESSORS)
-  # if(k==0){                                     
-  #   alpha <- as.numeric(coef[1])
-  #   phi <- as.numeric(coef[2:(p1+1)])
-  #   theta <- as.numeric(coef[(p1+2):(p1+q1+1)])
-  #   
-  #   z$alpha <- alpha
-  #   z$phi <- phi
-  #   z$theta <- theta
-  #   
-  #   errorhat<-rep(0,n) # E(error)=0 
-  #   etahat<-rep(NA,n)
-  #   
-  #   if(p1==0) {phi = as.matrix(0);ar=1}
-  #   if(q1==0) {theta = as.matrix(0);ma=1}
-  #   for(i in (m+1):n)
-  #   {
-  #     etahat[i]<-alpha + ynew_ar[(i-1),ar]%*%as.matrix(phi) + (theta%*%errorhat[i-ma])
-  #     errorhat[i]<- ynew[i]-etahat[i] # predictor scale
-  #   }
-  #   
-  #   q_hat <- linkinv(etahat[(m+1):n])   # fitted values 
-  #   
-  #   z$fitted <- ts(c(rep(NA,m),q_hat),start=start(y),frequency=frequency(y))
-  #   z$etahat <- etahat
-  #   z$errorhat <- errorhat
-  #   
-  #   
-  #   # Forecasting
-  #   ynew_prev <- c(ynew,rep(NA,h))
-  #   y_prev[1:n] <- z$fitted
-  #   
-  #   for(i in 1:h)
-  #   {
-  #     ynew_prev[n+i] <- alpha + (phi%*%ynew_prev[n+i-ar]) + (theta%*%errorhat[n+i-ma])
-  #     y_prev[n+i] <- linkinv(ynew_prev[n+i])
-  #     errorhat[n+i] <- 0 
-  #   }
-  #   
-  #   z$forecast <- y_prev[(n+1):(n+h)]
-  # } else{                              # with REGRESSORS
-  #   X_hat <- as.matrix(X_hat)
-  #   
-  #   alpha <- as.numeric(coef[1])
-  #   beta <- as.numeric(coef[2:(k+1)])
-  #   phi <- as.numeric(coef[(k+2):(k+p1+1)])
-  #   theta <- as.numeric(coef[(k+p1+2):(k+p1+q1+1)])
-  #   
-  #   z$alpha <- alpha
-  #   z$beta <- beta
-  #   z$phi <- phi
-  #   z$theta <- theta
-  #   
-  #   errorhat<-rep(0,n) # E(error)=0 
-  #   etahat<-rep(NA,n)
-  #   
-  #   if(p1==0) {phi = as.matrix(0);ar=1}
-  #   if(q1==0) {theta = as.matrix(0);ma=1}
-  #   
-  #   Xbeta <- X%*%as.matrix(beta)
-  #   Xbeta_ar <- suppressWarnings(matrix(Xbeta, (n-1), max(p, 1, na.rm = T)))
-  #   
-  #   for(i in (m+1):n)
-  #   {
-  #     etahat[i] <- alpha + Xbeta[i] + (ynew_ar[(i-1), ar] - Xbeta_ar[(i-1), ar])%*%as.matrix(phi) +
-  #       t(as.matrix(theta))%*%errorhat[i-ma]
-  #     errorhat[i] <- ynew[i] - etahat[i]
-  #   }
-  #   q_hat <- linkinv(etahat[(m+1):n])   # fitted values 
-  #   
-  #   z$fitted <- ts(c(rep(NA,m),q_hat),start=start(y),frequency=frequency(y))
-  #   z$etahat <- etahat
-  #   z$errorhat <- errorhat
-  #   
-  #   
-  #   # Forecasting
-  #   ynew_prev <- c(ynew,rep(NA,h))
-  #   y_prev[1:n] <- z$fitted
-  #   
-  #   X_prev <- rbind(X,X_hat)
-  #   
-  #   for(i in 1:h)
-  #   {
-  #     ynew_prev[n+i] <- alpha + X_prev[n+i,]%*%as.matrix(beta) +
-  #       (phi%*%(ynew_prev[n+i-ar]-X_prev[n+i-ar,]%*%as.matrix(beta))) +
-  #       (theta%*%errorhat[n+i-ma])
-  #     y_prev[n+i] <- linkinv(ynew_prev[n+i])
-  #     errorhat[n+i] <- 0
-  #   }
-  #   
-  #   z$forecast <- y_prev[(n+1):(n+h)]
-  #   
-  # }
-  # 
-  # 
-  # # Quantile residuals 
-  # z$residuals <- as.vector(qnorm(pRUR(y[(m+1):n],z$fitted[(m+1):n])))  #mudar aqui
-  # residc <- z$residuals 
+
+  # Predicted values   (NO REGRESSORS)
+  if(k==0){
+    alpha <- as.numeric(coef[1])
+    phi <- as.numeric(coef[2:(p1+1)])
+    theta <- as.numeric(coef[(p1+2):(p1+q1+1)])
+
+    z$alpha <- alpha
+    z$phi <- phi
+    z$theta <- theta
+
+    errorhat<-rep(0,n) # E(error)=0
+    etahat<-rep(NA,n)
+
+    if(p1==0) {phi = as.matrix(0);ar=1}
+    if(q1==0) {theta = as.matrix(0);ma=1}
+    for(i in (m+1):n)
+    {
+      etahat[i]<-alpha + ynew_ar[(i-1),ar]%*%as.matrix(phi) + (theta%*%errorhat[i-ma])
+      errorhat[i]<- ynew[i]-etahat[i] # predictor scale
+    }
+
+    q_hat <- linkinv(etahat[(m+1):n])   # fitted values
+
+    z$fitted <- ts(c(rep(NA,m),q_hat),start=start(y),frequency=frequency(y))
+    z$etahat <- etahat
+    z$errorhat <- errorhat
+
+
+    # Forecasting
+    ynew_prev <- c(ynew,rep(NA,h))
+    y_prev[1:n] <- z$fitted
+
+    for(i in 1:h)
+    {
+      ynew_prev[n+i] <- alpha + (phi%*%ynew_prev[n+i-ar]) + (theta%*%errorhat[n+i-ma])
+      y_prev[n+i] <- linkinv(ynew_prev[n+i])
+      errorhat[n+i] <- 0
+    }
+
+    z$forecast <- y_prev[(n+1):(n+h)]
+  } else{                              # with REGRESSORS
+    X_hat <- as.matrix(X_hat)
+
+    alpha <- as.numeric(coef[1])
+    beta <- as.numeric(coef[2:(k+1)])
+    phi <- as.numeric(coef[(k+2):(k+p1+1)])
+    theta <- as.numeric(coef[(k+p1+2):(k+p1+q1+1)])
+
+    z$alpha <- alpha
+    z$beta <- beta
+    z$phi <- phi
+    z$theta <- theta
+
+    errorhat<-rep(0,n) # E(error)=0
+    etahat<-rep(NA,n)
+
+    if(p1==0) {phi = as.matrix(0);ar=1}
+    if(q1==0) {theta = as.matrix(0);ma=1}
+
+    Xbeta <- X%*%as.matrix(beta)
+    Xbeta_ar <- suppressWarnings(matrix(Xbeta, (n-1), max(p, 1, na.rm = T)))
+
+    for(i in (m+1):n)
+    {
+      etahat[i] <- alpha + Xbeta[i] + (ynew_ar[(i-1), ar] - Xbeta_ar[(i-1), ar])%*%as.matrix(phi) +
+        t(as.matrix(theta))%*%errorhat[i-ma]
+      errorhat[i] <- ynew[i] - etahat[i]
+    }
+    q_hat <- linkinv(etahat[(m+1):n])   # fitted values
+
+    z$fitted <- ts(c(rep(NA,m),q_hat),start=start(y),frequency=frequency(y))
+    z$etahat <- etahat
+    z$errorhat <- errorhat
+
+
+    # Forecasting
+    ynew_prev <- c(ynew,rep(NA,h))
+    y_prev[1:n] <- z$fitted
+
+    X_prev <- rbind(X,X_hat)
+
+    for(i in 1:h)
+    {
+      ynew_prev[n+i] <- alpha + X_prev[n+i,]%*%as.matrix(beta) +
+        (phi%*%(ynew_prev[n+i-ar]-X_prev[n+i-ar,]%*%as.matrix(beta))) +
+        (theta%*%errorhat[n+i-ma])
+      y_prev[n+i] <- linkinv(ynew_prev[n+i])
+      errorhat[n+i] <- 0
+    }
+
+    z$forecast <- y_prev[(n+1):(n+h)]
+
+  }
+
+
+  # Quantile residuals
+  z$residuals <- as.vector(qnorm(pRUR(y[(m+1):n], z$fitted[(m+1):n])))
+  residc <- z$residuals
   
   
   return(z)
   
-}
-
-
+  }
 
 
 # PARA TESTAR 
@@ -377,3 +370,4 @@ RURarma.fit<-function (y, ar = NA, ma = NA, tau = .5, link = "logit", h = 1,
 # fit<-RURarma.fit(y, ma=1, ar=1)
 # 
 # fit$model
+
