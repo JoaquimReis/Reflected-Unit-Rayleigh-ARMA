@@ -1,7 +1,7 @@
 
 #SIMULACOA DE MONTE CARLO ORIGINAL
 
-# simu - ARMA(1,1) - apenas medias moveis
+# simu - ARMA(1,1)
 
 rm(list = ls())
 
@@ -82,4 +82,5 @@ system.time({
 end_time <- Sys.time()
 execution_time <- end_time - start_time
 print(paste("Tempo total de execução:", round(as.numeric(execution_time, units = "secs")), "segundos"))
+
 
