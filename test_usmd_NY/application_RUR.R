@@ -2,8 +2,8 @@ library(forecast)
 library(ggplot2)
 library(BTSR)
 
-source("00_functions_RUR.R")
-source("00_fit_RUR.R")
+source("FuncoesRUR.R")
+source("FitRUR.R")
 
 ######################
 ## Data preparation ##
