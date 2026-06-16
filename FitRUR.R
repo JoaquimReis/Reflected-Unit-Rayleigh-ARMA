@@ -2,9 +2,9 @@
 # FUNÇÃO PARA AJUSTE DO MODELO RUR ARMA
 # ---------------------------------------------------------------------------
 RURarma.fit<-function (y, ar = NA, ma = NA, tau = .5, link = "logit", h = 1, 
-                       diag = 0, X = NA, X_hat = NA)
+                       diag = 0, X = NA, X_hat = NA, use_gradient = TRUE)
 {
-  source("Funcoes.R")
+  source("FuncoesRUR.R")
   if (min(y) <= 0 || max(y) >= 1)
     stop("OUT OF RANGE (0,1)!")
   
@@ -29,9 +29,14 @@ RURarma.fit<-function (y, ar = NA, ma = NA, tau = .5, link = "logit", h = 1,
   # verifica se o que foi escrito para a funcao de ligação é um valor válido
   
   if(!is.character(linktemp)){
-    linktemp <- deparse(linktemp)
-    if (linktemp == 'link'){
-      linktemp <- eval(link)
+    linktemp_eval <- try(eval(linktemp, parent.frame()), silent = TRUE)
+    if(is.character(linktemp_eval)){
+      linktemp <- linktemp_eval
+    } else {
+      linktemp <- deparse(linktemp)
+      if (linktemp == 'link'){
+        linktemp <- eval(link)
+      }
     }
   }
   
@@ -69,10 +74,21 @@ RURarma.fit<-function (y, ar = NA, ma = NA, tau = .5, link = "logit", h = 1,
   } else ma = q1 <- 0 
   
   # Verifica se há elemntos NA em `X` - Covariaveis
-  if(any(is.na(X)) == F){
-    names_beta<-c(paste("beta", 1 : ncol(as.matrix(X)), sep = ""))
-    Xm <- X[(m+1):n, ]     
+  if(!(length(X) == 1 && is.na(X))){
+    X <- as.matrix(X)
+    if(nrow(X) != n) stop("X must have the same number of rows as y.")
+    names_beta<-c(paste("beta", 1 : ncol(X), sep = ""))
+    Xm <- X[(m+1):n, , drop = FALSE]
     k = ncol(X)
+
+    if(h > 0){
+      if(length(X_hat) == 1 && is.na(X_hat)){
+        stop("X_hat must be provided when h > 0 and X is used.")
+      }
+      X_hat <- as.matrix(X_hat)
+      if(nrow(X_hat) != h) stop("X_hat must have h rows.")
+      if(ncol(X_hat) != k) stop("X_hat must have the same number of columns as X.")
+    }
   } else {
     k = 0 
     X <- matrix(rep(0,n), nrow = n)
@@ -207,10 +223,16 @@ RURarma.fit<-function (y, ar = NA, ma = NA, tau = .5, link = "logit", h = 1,
   # ATE AQUI
   ##############################################################################
   #ATENCAO AQUI - USO DO VETOR SCORE
-  opt <- optim(initial, loglik,
-               escore.RUR,  # vetor escore adaptado
-               method = "BFGS", hessian = TRUE,
-               control = list(fnscale = -1, maxit = maxit1, reltol = 1e-12))
+  if(isTRUE(use_gradient)){
+    opt <- optim(initial, loglik,
+                 escore.RUR,  # vetor escore adaptado
+                 method = "BFGS", hessian = TRUE,
+                 control = list(fnscale = -1, maxit = maxit1, reltol = 1e-12))
+  } else {
+    opt <- optim(initial, loglik,
+                 method = "BFGS", hessian = TRUE,
+                 control = list(fnscale = -1, maxit = maxit1, reltol = 1e-12))
+  }
   
   if (opt$conv != 0)
   {
@@ -244,7 +266,7 @@ RURarma.fit<-function (y, ar = NA, ma = NA, tau = .5, link = "logit", h = 1,
   z$counts <- as.numeric(opt$counts[1])
   
   
-  if(any(is.na(X)==F))
+  if(k > 0)
   {
     z$k<- (p1+q1+k+1)
     z$aic <- -2*(z$loglik)+2*(z$k)
@@ -297,17 +319,18 @@ RURarma.fit<-function (y, ar = NA, ma = NA, tau = .5, link = "logit", h = 1,
     ynew_prev <- c(ynew,rep(NA,h))
     y_prev[1:n] <- z$fitted
     
-    for(i in 1:h)
-    {
-      ynew_prev[n+i] <- alpha + (phi%*%ynew_prev[n+i-ar]) + (theta%*%errorhat[n+i-ma])
-      y_prev[n+i] <- linkinv(ynew_prev[n+i])
-      errorhat[n+i] <- 0
+    if(h > 0){
+      for(i in 1:h)
+      {
+        ynew_prev[n+i] <- alpha + (phi%*%ynew_prev[n+i-ar]) + (theta%*%errorhat[n+i-ma])
+        y_prev[n+i] <- linkinv(ynew_prev[n+i])
+        errorhat[n+i] <- 0
+      }
+      z$forecast <- y_prev[(n+1):(n+h)]
+    } else {
+      z$forecast <- numeric(0)
     }
-    
-    z$forecast <- y_prev[(n+1):(n+h)]
   } else{                              # with REGRESSORS
-    X_hat <- as.matrix(X_hat)
-    
     alpha <- as.numeric(coef[1])
     beta <- as.numeric(coef[2:(k+1)])
     phi <- as.numeric(coef[(k+2):(k+p1+1)])
@@ -344,24 +367,27 @@ RURarma.fit<-function (y, ar = NA, ma = NA, tau = .5, link = "logit", h = 1,
     ynew_prev <- c(ynew,rep(NA,h))
     y_prev[1:n] <- z$fitted
     
-    X_prev <- rbind(X,X_hat)
-    
-    for(i in 1:h)
-    {
-      ynew_prev[n+i] <- alpha + X_prev[n+i,]%*%as.matrix(beta) +
-        (phi%*%(ynew_prev[n+i-ar]-X_prev[n+i-ar,]%*%as.matrix(beta))) +
-        (theta%*%errorhat[n+i-ma])
-      y_prev[n+i] <- linkinv(ynew_prev[n+i])
-      errorhat[n+i] <- 0
+    if(h > 0){
+      X_prev <- rbind(X,X_hat)
+
+      for(i in 1:h)
+      {
+        ynew_prev[n+i] <- alpha + X_prev[n+i,]%*%as.matrix(beta) +
+          (phi%*%(ynew_prev[n+i-ar]-X_prev[n+i-ar,]%*%as.matrix(beta))) +
+          (theta%*%errorhat[n+i-ma])
+        y_prev[n+i] <- linkinv(ynew_prev[n+i])
+        errorhat[n+i] <- 0
+      }
+      z$forecast <- y_prev[(n+1):(n+h)]
+    } else {
+      z$forecast <- numeric(0)
     }
-    
-    z$forecast <- y_prev[(n+1):(n+h)]
     
   }
   
   
   # Quantile residuals
-  z$residuals <- as.vector(qnorm(pRUR(y[(m+1):n], z$fitted[(m+1):n])))
+  z$residuals <- as.vector(qnorm(pRUR(y[(m+1):n], z$fitted[(m+1):n], tau = tau)))
   residc <- z$residuals
   
   
@@ -374,7 +400,7 @@ RURarma.fit<-function (y, ar = NA, ma = NA, tau = .5, link = "logit", h = 1,
 
 # set.seed(2)
 # 
-# source("simuRUR.R")
+# source("00_simu_RUR.R")
 # 
 # y<-simu.RUR(100,phi=0.2,theta=0.4, alpha=1, tau=0.5,freq=12,link="logit")
 # 
