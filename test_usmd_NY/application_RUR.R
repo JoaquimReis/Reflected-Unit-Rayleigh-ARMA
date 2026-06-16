@@ -13,7 +13,7 @@ source("FitRUR.R")
 # Serie: proporcao semanal da area do estado sem seca.
 # A coluna y_rur e a versao ajustada para o intervalo aberto (0,1).
 
-data <- read.csv("4_apl_none_area.csv", stringsAsFactors = FALSE)
+data <- read.csv("usdm_NY_none_area.csv", stringsAsFactors = FALSE)
 data$date <- as.Date(data$date)
 data$none <- as.numeric(data$none)
 data$y_rur <- as.numeric(data$y_rur)
