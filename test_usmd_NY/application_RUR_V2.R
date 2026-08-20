@@ -1,8 +1,8 @@
 library(forecast)
 library(ggplot2)
 
-source("FuncoesRUR.R")
-source("FitRUR.R")
+source("https://raw.githubusercontent.com/JoaquimReis/Reflected-Unit-Rayleigh-ARMA/main/FuncoesRUR.R")
+source("https://raw.githubusercontent.com/JoaquimReis/Reflected-Unit-Rayleigh-ARMA/main/FitRUR.R")
 
 ######################
 ## Data preparation ##

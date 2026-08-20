@@ -1,14 +1,17 @@
 library(forecast)
 library(BTSR)
 
-source("FuncoesRUR.R")
-source("FitRUR.R")
+source("https://raw.githubusercontent.com/JoaquimReis/Reflected-Unit-Rayleigh-ARMA/main/FuncoesRUR.R")
+source("https://raw.githubusercontent.com/JoaquimReis/Reflected-Unit-Rayleigh-ARMA/main/FitRUR.R")
+
+usdm_NY <- "https://raw.githubusercontent.com/JoaquimReis/Reflected-Unit-Rayleigh-ARMA/main/test_usmd_NY/usdm_NY_none_area.csv"
+
+data <- read.csv(usdm_NY)
 
 #########################
 # Leitura e organizacao #
 #########################
 
-data <- read.csv("usdm_NY_none_area.csv", stringsAsFactors = FALSE)
 data$date <- as.Date(data$date)
 data$none <- as.numeric(data$none)
 data$y_rur <- as.numeric(data$y_rur)
