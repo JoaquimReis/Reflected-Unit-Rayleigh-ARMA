@@ -4,7 +4,7 @@
 RURarma.fit<-function (y, ar = NA, ma = NA, tau = .5, link = "logit", h = 1, 
                        diag = 0, X = NA, X_hat = NA, use_gradient = TRUE)
 {
-  source("FuncoesRUR.R")
+  source("https://raw.githubusercontent.com/JoaquimReis/Reflected-Unit-Rayleigh-ARMA/main/FuncoesRUR.R")
   if (min(y) <= 0 || max(y) >= 1)
     stop("OUT OF RANGE (0,1)!")
   
